@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
+from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,7 +21,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-t%h$!1_y$q*#^3298_4ovsh=$tg8lhfycmf)s*v-)31od%8oj%'
+SECRET_KEY = config('SECRET_KEY')
+
+# Si no se encuentra la clave en el archivo .env, puedes lanzar un error opcionalmente
+if not SECRET_KEY:
+    raise ValueError("La variable de entorno SECRET_KEY no está configurada.")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -37,6 +42,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'inventario.apps.InventarioConfig',
 ]
 
 MIDDLEWARE = [
