@@ -82,6 +82,9 @@ class Roles(models.Model):
         db_table = 'roles'
         verbose_name = "Rol"
         verbose_name_plural = "Roles"
+        
+    def __str__(self):
+        return self.nombrerol
 
 class Tejidos(models.Model):
     idtejido = models.AutoField(db_column='idTejido', primary_key=True)
@@ -101,9 +104,10 @@ class Usuarios(models.Model):
     apellidomaterno = models.CharField(db_column='ApellidoMaterno', max_length=45)
     idrol = models.ForeignKey(Roles, db_column='idRol', blank=True, null=True, on_delete=models.SET_NULL)
     sexo = models.CharField(db_column='Sexo', max_length=45)
+    password = models.CharField(db_column='Password', max_length=45)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'usuarios'
         verbose_name = "Usuario"
         verbose_name_plural = "Usuarios"

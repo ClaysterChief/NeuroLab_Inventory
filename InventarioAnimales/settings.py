@@ -35,15 +35,28 @@ ALLOWED_HOSTS = []
 
 # Application definition
 
-INSTALLED_APPS = [
+BASE_APPS = [
+    # Django core apps
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+]
+
+THIRD_PARTY_APPS = [
+    # Aquí puedes agregar tus aplicaciones de terceros
+    'rest_framework',
+]
+
+LOCAL_APPS = [
+    # Aquí puedes agregar tus aplicaciones locales
+    # 'mi_aplicacion', # Reemplaza con el nombre de tu aplicación local
     'inventario.apps.InventarioConfig',
 ]
+
+INSTALLED_APPS = BASE_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
