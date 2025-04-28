@@ -10,6 +10,9 @@ class Anestesicos(models.Model):
         db_table = 'anestesicos'
         verbose_name = "Anestésico"
         verbose_name_plural = "Anestésicos"
+        
+    def __str__(self):
+        return self.nombreanestesico
 
 class Bitacora(models.Model):
     idbitacora = models.AutoField(db_column='idBitacora', primary_key=True)
@@ -31,6 +34,9 @@ class Bitacora(models.Model):
         db_table = 'bitacora'
         verbose_name = "Bitácora"
         verbose_name_plural = "Bitácoras"
+        
+    def __str__(self):
+        return f"Bitácora {self.idbitacora} - Rata {self.idrata} - Usuario {self.idusuario}"
 
 class Cajas(models.Model):
     idcaja = models.AutoField(db_column='idCaja', primary_key=True)
@@ -47,6 +53,9 @@ class Cajas(models.Model):
         db_table = 'cajas'
         verbose_name = "Caja"
         verbose_name_plural = "Cajas"
+        
+    def __str__(self):
+        return f"Caja {self.idcaja} - {self.cantidadratas} ratas"
 
 class Condiciones(models.Model):
     idcondicion = models.AutoField(db_column='idCondicion', primary_key=True)
@@ -58,6 +67,9 @@ class Condiciones(models.Model):
         db_table = 'condiciones'
         verbose_name = "Condición"
         verbose_name_plural = "Condiciones"
+        
+    def __str__(self):
+        return self.nombrecondicion
 
 class Ratas(models.Model):
     idrata = models.OneToOneField(Bitacora, db_column='idRata', primary_key=True, on_delete=models.CASCADE)
@@ -71,6 +83,9 @@ class Ratas(models.Model):
         db_table = 'ratas'
         verbose_name = "Rata"
         verbose_name_plural = "Ratas"
+        
+    def __str__(self):
+        return f"Rata {self.idrata} - {self.numerocola}"
 
 class Roles(models.Model):
     idrol = models.AutoField(db_column='idRol', primary_key=True)
@@ -96,6 +111,9 @@ class Tejidos(models.Model):
         db_table = 'tejidos'
         verbose_name = "Tejido"
         verbose_name_plural = "Tejidos"
+        
+    def __str__(self):
+        return self.nombretejido
 
 class Usuarios(models.Model):
     idusuario = models.AutoField(db_column='idUsuario', primary_key=True)
@@ -111,3 +129,8 @@ class Usuarios(models.Model):
         db_table = 'usuarios'
         verbose_name = "Usuario"
         verbose_name_plural = "Usuarios"
+        
+    def __str__(self):
+            return f"{self.nombreusuario} {self.apellidopaterno} {self.apellidomaterno}"
+    def get_full_name(self):
+        return f"{self.nombreusuario} {self.apellidopaterno} {self.apellidomaterno}"
