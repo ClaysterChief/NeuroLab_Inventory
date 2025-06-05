@@ -2,6 +2,19 @@ from django.shortcuts import render
 from rest_framework import viewsets
 from .models import Anestesicos, Bitacora, Cajas, Condiciones, Ratas, Roles, Tejidos, Usuarios
 from .serializers import AnestesicosSerializer, BitacoraSerializer, CajasSerializer, CondicionesSerializer, RatasSerializer, RolesSerializer, TejidosSerializer, UsuariosSerializer
+from django.contrib.auth import authenticate
+from django.http import JsonResponse
+
+def login_view(request):
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        user = authenticate(username=username, password=password)
+        if user is not None:
+            return JsonResponse({'success': True, 'message': 'Login exitoso'})
+        else:
+            return JsonResponse({'success': False, 'message': 'Credenciales inválidas'}, status=401)
+    return JsonResponse({'success': False, 'message': 'Método no permitido'}, status=405)
 
 class AnestesicosViewSet(viewsets.ModelViewSet):
     queryset = Anestesicos.objects.all()

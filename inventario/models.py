@@ -1,4 +1,37 @@
 from django.db import models
+from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
+
+class Roles(models.Model):
+    idrol = models.AutoField(db_column='idRol', primary_key=True)
+    nombrerol = models.CharField(db_column='NombreRol', max_length=45)
+    descripcion = models.CharField(db_column='Descripción', max_length=45)
+
+    class Meta:
+        managed = False
+        db_table = 'roles'
+        verbose_name = "Rol"
+        verbose_name_plural = "Roles"
+        
+    def __str__(self):
+        return self.nombrerol
+
+class Usuarios(models.Model):
+    idusuario = models.AutoField(db_column='idUsuario', primary_key=True)
+    nombreusuario = models.CharField(db_column='NombreUsuario', max_length=45, unique=True)
+    apellidopaterno = models.CharField(db_column='ApellidoPaterno', max_length=45)
+    apellidomaterno = models.CharField(db_column='ApellidoMaterno', max_length=45)
+    idrol = models.ForeignKey('Roles', db_column='idRol', blank=True, null=True, on_delete=models.SET_NULL)
+    sexo = models.CharField(db_column='Sexo', max_length=45)
+    password = models.CharField(db_column='Password', max_length=45)  # Field name made lowercase.
+
+    class Meta:
+        managed = False
+        db_table = 'usuarios'
+        verbose_name = "Usuario"
+        verbose_name_plural = "Usuarios"
+
+    def __str__(self):
+        return self.nombreusuario
 
 class Anestesicos(models.Model):
     idanestesico = models.AutoField(db_column='idAnestesico', primary_key=True)
@@ -87,19 +120,6 @@ class Ratas(models.Model):
     def __str__(self):
         return f"Rata {self.idrata} - {self.numerocola}"
 
-class Roles(models.Model):
-    idrol = models.AutoField(db_column='idRol', primary_key=True)
-    nombrerol = models.CharField(db_column='NombreRol', max_length=45)
-    descripcion = models.CharField(db_column='Descripción', max_length=45)
-
-    class Meta:
-        managed = False
-        db_table = 'roles'
-        verbose_name = "Rol"
-        verbose_name_plural = "Roles"
-        
-    def __str__(self):
-        return self.nombrerol
 
 class Tejidos(models.Model):
     idtejido = models.AutoField(db_column='idTejido', primary_key=True)
@@ -114,23 +134,3 @@ class Tejidos(models.Model):
         
     def __str__(self):
         return self.nombretejido
-
-class Usuarios(models.Model):
-    idusuario = models.AutoField(db_column='idUsuario', primary_key=True)
-    nombreusuario = models.CharField(db_column='NombreUsuario', max_length=45)
-    apellidopaterno = models.CharField(db_column='ApellidoPaterno', max_length=45)
-    apellidomaterno = models.CharField(db_column='ApellidoMaterno', max_length=45)
-    idrol = models.ForeignKey(Roles, db_column='idRol', blank=True, null=True, on_delete=models.SET_NULL)
-    sexo = models.CharField(db_column='Sexo', max_length=45)
-    password = models.CharField(db_column='Password', max_length=45)
-
-    class Meta:
-        managed = True
-        db_table = 'usuarios'
-        verbose_name = "Usuario"
-        verbose_name_plural = "Usuarios"
-        
-    def __str__(self):
-            return f"{self.nombreusuario} {self.apellidopaterno} {self.apellidomaterno}"
-    def get_full_name(self):
-        return f"{self.nombreusuario} {self.apellidopaterno} {self.apellidomaterno}"
