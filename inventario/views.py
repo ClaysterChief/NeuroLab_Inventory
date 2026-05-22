@@ -119,5 +119,3 @@ class UsuariosViewSet(viewsets.ModelViewSet):
     
     def perform_destroy(self, instance):
         instance.delete()
-        
-# Create your views here.
