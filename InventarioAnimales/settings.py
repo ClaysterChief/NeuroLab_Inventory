@@ -26,6 +26,7 @@ THIRD_PARTY_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
+    'django_filters',
 ]
 
 LOCAL_APPS = [
@@ -76,12 +77,16 @@ CSRF_TRUSTED_ORIGINS = [
 # ─── Django REST Framework ────────────────────────────────────────────────────
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        # Clase personalizada que valida JWT contra la tabla Usuarios
         'inventario.authentication.UsuariosJWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ],
 }
 
 # ─── Simple JWT ───────────────────────────────────────────────────────────────

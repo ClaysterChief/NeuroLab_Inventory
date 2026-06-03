@@ -26,8 +26,6 @@ class Usuarios(models.Model):
         on_delete=models.SET_NULL, related_name='usuarios'
     )
     sexo = models.CharField(db_column='Sexo', max_length=45)
-    # NOTA: el campo en la BD debe ser VARCHAR(128) para soportar contraseñas hasheadas.
-    # Ejecutar en MariaDB: ALTER TABLE usuarios MODIFY COLUMN Password VARCHAR(128);
     password = models.CharField(db_column='Password', max_length=128)
 
     class Meta:
@@ -39,13 +37,8 @@ class Usuarios(models.Model):
     def __str__(self):
         return self.nombreusuario
 
-    # ── Propiedades requeridas por Django REST Framework ──────────────────────
-    # DRF verifica request.user.is_authenticated en sus permission classes.
-    # Como Usuarios no extiende AbstractBaseUser, las definimos manualmente.
-
     @property
     def is_authenticated(self):
-        """Siempre True: si el objeto existe, el usuario está autenticado."""
         return True
 
     @property
@@ -110,34 +103,11 @@ class Tejidos(models.Model):
         return self.nombretejido
 
 
-class Ratas(models.Model):
-    # CORRECCIÓN: idrata es PK propia, no FK a Bitacora.
-    # El modelo anterior tenía la relación invertida.
-    idrata = models.AutoField(db_column='idRata', primary_key=True)
-    fechacirugia = models.DateField(db_column='FechaCirugia', blank=True, null=True)
-    pesosemanal = models.FloatField(db_column='PesoSemanal', blank=True, null=True)
-    numerocola = models.IntegerField(db_column='NumeroCola')
-    idcondicion = models.ForeignKey(
-        Condiciones, db_column='idCondicion',
-        on_delete=models.CASCADE, related_name='ratas'
-    )
-
-    class Meta:
-        managed = False
-        db_table = 'ratas'
-        verbose_name = 'Rata'
-        verbose_name_plural = 'Ratas'
-
-    def __str__(self):
-        return f'Rata #{self.idrata} (cola: {self.numerocola})'
-
-
 class Cajas(models.Model):
     idcaja = models.AutoField(db_column='idCaja', primary_key=True)
     cantidadratas = models.IntegerField(db_column='CantidadRatas')
-    idrata = models.ForeignKey(
-        Ratas, db_column='idRata', on_delete=models.CASCADE, related_name='cajas'
-    )
+    # idrata ahora es opcional: una caja puede tener ratas sin ID registrado
+    idrata = models.IntegerField(db_column='idRata', blank=True, null=True)
     sexo = models.CharField(db_column='Sexo', max_length=45)
     fechanacimiento = models.DateField(db_column='FechaNacimiento')
     idusuario = models.ForeignKey(
@@ -157,6 +127,38 @@ class Cajas(models.Model):
         return f'Caja #{self.idcaja} — {self.cantidadratas} ratas ({self.sexo})'
 
 
+class Ratas(models.Model):
+    """
+    id     → PK auto-increment interno (no visible al usuario)
+    idrata → número de laboratorio por sexo (M-1, H-1, M-2, H-2 …)
+             unique_together(idrata, sexo) garantiza no repetición dentro del mismo sexo
+    """
+    id = models.AutoField(db_column='id', primary_key=True)
+    idrata = models.IntegerField(db_column='idRata')
+    sexo = models.CharField(db_column='Sexo', max_length=45)
+    idcaja = models.ForeignKey(
+        Cajas, db_column='idCaja', blank=True, null=True,
+        on_delete=models.SET_NULL, related_name='ratas_registradas'
+    )
+    fechacirugia = models.DateField(db_column='FechaCirugia', blank=True, null=True)
+    pesosemanal = models.FloatField(db_column='PesoSemanal', blank=True, null=True)
+    numerocola = models.IntegerField(db_column='NumeroCola')
+    idcondicion = models.ForeignKey(
+        Condiciones, db_column='idCondicion', blank=True, null=True,
+        on_delete=models.SET_NULL, related_name='ratas'
+    )
+
+    class Meta:
+        managed = False
+        db_table = 'ratas'
+        verbose_name = 'Rata'
+        verbose_name_plural = 'Ratas'
+        unique_together = [('idrata', 'sexo')]
+
+    def __str__(self):
+        return f'Rata {self.sexo[0]}-{self.idrata} (cola: {self.numerocola})'
+
+
 class Bitacora(models.Model):
     idbitacora = models.AutoField(db_column='idBitacora', primary_key=True)
     idrata = models.ForeignKey(
@@ -166,8 +168,6 @@ class Bitacora(models.Model):
         Usuarios, db_column='idUsuario', blank=True, null=True,
         on_delete=models.SET_NULL, related_name='bitacoras'
     )
-    # NOTA: el campo en BD se llama 'FechaCirujia' (typo). Corregir con:
-    # ALTER TABLE bitacora CHANGE FechaCirujia FechaCirugia DATE;
     fechacirujia = models.DateField(db_column='FechaCirujia')
     dosis = models.FloatField(db_column='Dosis', blank=True, null=True)
     dosistotal = models.FloatField(db_column='DosisTotal', blank=True, null=True)
@@ -176,7 +176,6 @@ class Bitacora(models.Model):
         on_delete=models.CASCADE, related_name='bitacoras'
     )
     pesoexperimento = models.FloatField(db_column='PesoExperimento', blank=True, null=True)
-    # CORRECCIÓN: era IntegerField, pero es texto descriptivo del procedimiento
     actividad = models.TextField(db_column='Actividad', blank=True, null=True)
     idtejido = models.ForeignKey(
         Tejidos, db_column='idTejido', blank=True, null=True,
