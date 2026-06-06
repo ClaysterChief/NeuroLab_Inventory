@@ -20,8 +20,8 @@ class RatasAdmin(admin.ModelAdmin):
 
 @admin.register(Cajas)
 class CajasAdmin(admin.ModelAdmin):
-    list_display = ('idcaja', 'cantidadratas', 'idrata', 'sexo', 'fechanacimiento', 'idusuario', 'talla')
-    search_fields = ('idrata__idrata', 'idusuario__nombreusuario')
+    list_display = ('idcaja', 'cantidadratas', 'sexo', 'fechanacimiento', 'idusuario', 'talla')
+    search_fields = ('idusuario__nombreusuario',)
     list_filter = ('sexo', 'idusuario')
     ordering = ('idcaja',)
 

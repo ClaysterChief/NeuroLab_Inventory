@@ -3,7 +3,8 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     AnestesicosViewSet, BitacoraViewSet, CajasViewSet,
     CondicionesViewSet, RatasViewSet, RolesViewSet,
-    TejidosViewSet, UsuariosViewSet, login_view, me_view
+    TejidosViewSet, UsuariosViewSet, login_view, me_view,
+    reporte_bitacora, reporte_inventario,
 )
 
 router = DefaultRouter()
@@ -20,4 +21,6 @@ urlpatterns = [
     path('', include(router.urls)),
     path('login/', login_view, name='login'),
     path('me/', me_view, name='me'),
+    path('reportes/inventario/', reporte_inventario, name='reporte_inventario'),
+    path('reportes/bitacora/', reporte_bitacora, name='reporte_bitacora'),
 ]

@@ -103,11 +103,10 @@ class Tejidos(models.Model):
         return self.nombretejido
 
 
+# ── Cajas se define ANTES de Ratas para que el FK directo funcione ──────────
 class Cajas(models.Model):
     idcaja = models.AutoField(db_column='idCaja', primary_key=True)
     cantidadratas = models.IntegerField(db_column='CantidadRatas')
-    # idrata ahora es opcional: una caja puede tener ratas sin ID registrado
-    idrata = models.IntegerField(db_column='idRata', blank=True, null=True)
     sexo = models.CharField(db_column='Sexo', max_length=45)
     fechanacimiento = models.DateField(db_column='FechaNacimiento')
     idusuario = models.ForeignKey(
@@ -124,21 +123,18 @@ class Cajas(models.Model):
         verbose_name_plural = 'Cajas'
 
     def __str__(self):
-        return f'Caja #{self.idcaja} — {self.cantidadratas} ratas ({self.sexo})'
+        return f'Caja #{self.idcaja} ({self.sexo})'
 
 
 class Ratas(models.Model):
-    """
-    id     → PK auto-increment interno (no visible al usuario)
-    idrata → número de laboratorio por sexo (M-1, H-1, M-2, H-2 …)
-             unique_together(idrata, sexo) garantiza no repetición dentro del mismo sexo
-    """
-    id = models.AutoField(db_column='id', primary_key=True)
+    # PK interna — auto-incremental, usada para URLs de API (PUT/DELETE)
+    id = models.AutoField(primary_key=True)
+    # ID secuencial por sexo: M-1, M-2... / H-1, H-2... UNIQUE con Sexo en BD
     idrata = models.IntegerField(db_column='idRata')
-    sexo = models.CharField(db_column='Sexo', max_length=45)
+    sexo = models.CharField(db_column='Sexo', max_length=10)
     idcaja = models.ForeignKey(
         Cajas, db_column='idCaja', blank=True, null=True,
-        on_delete=models.SET_NULL, related_name='ratas_registradas'
+        on_delete=models.SET_NULL, related_name='ratas_en_caja'
     )
     fechacirugia = models.DateField(db_column='FechaCirugia', blank=True, null=True)
     pesosemanal = models.FloatField(db_column='PesoSemanal', blank=True, null=True)
@@ -156,7 +152,8 @@ class Ratas(models.Model):
         unique_together = [('idrata', 'sexo')]
 
     def __str__(self):
-        return f'Rata {self.sexo[0]}-{self.idrata} (cola: {self.numerocola})'
+        prefix = self.sexo[0] if self.sexo else '?'
+        return f'Rata {prefix}-{self.idrata} (cola: {self.numerocola})'
 
 
 class Bitacora(models.Model):
@@ -182,7 +179,9 @@ class Bitacora(models.Model):
         on_delete=models.SET_NULL, related_name='bitacoras'
     )
     archivos = models.CharField(db_column='Archivos', max_length=45, blank=True, null=True)
-    ubicacionarchivo = models.CharField(db_column='UbicacionArchivo', max_length=45, blank=True, null=True)
+    ubicacionarchivo = models.CharField(
+        db_column='UbicacionArchivo', max_length=45, blank=True, null=True
+    )
     notas = models.CharField(db_column='Notas', max_length=45, blank=True, null=True)
 
     class Meta:
