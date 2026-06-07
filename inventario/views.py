@@ -16,6 +16,10 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from django.http import HttpResponse
 from .reports import generate_bitacora_pdf, generate_inventario_pdf
+from .reports import (
+    generate_bitacora_pdf, generate_inventario_pdf,
+    generate_inventario_excel, generate_bitacora_excel,   # ← agregar
+)
 from .filters import BitacoraFilter, CajasFilter, RatasFilter
 from .models import Anestesicos, Bitacora, Cajas, Condiciones, Ratas, Roles, Tejidos, Usuarios
 from .permissions import IsAdminRole, ReadOnlyForPracticante
@@ -160,4 +164,50 @@ def reporte_bitacora(request):
     buffer = generate_bitacora_pdf()
     response = HttpResponse(buffer, content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="bitacora_neurolab.pdf"'
-    return response    
+    return response
+
+# ─── Reportes Excel ─────────────────────────────────────────────────────────────
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def reporte_inventario_excel(request):
+    """GET /api/reportes/inventario/excel/"""
+    buffer = generate_inventario_excel()
+    response = HttpResponse(
+        buffer,
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename="inventario_neurolab.xlsx"'
+    return response
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def reporte_bitacora_excel(request):
+    """GET /api/reportes/bitacora/excel/"""
+    buffer = generate_bitacora_excel()
+    response = HttpResponse(
+        buffer,
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename="bitacora_neurolab.xlsx"'
+    return response
+
+# ─── Dashboard con estadísticas ──────────────────────────────────────────────────────────────
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def stats_view(request):
+    """GET /api/stats/ — Contadores para el dashboard."""
+    from django.utils import timezone
+    inicio_mes = timezone.now().date().replace(day=1)
+
+    return Response({
+        'cajas':             Cajas.objects.count(),
+        'ratas_total':       Ratas.objects.count(),
+        'ratas_macho':       Ratas.objects.filter(sexo__iexact='Macho').count(),
+        'ratas_hembra':      Ratas.objects.filter(sexo__iexact='Hembra').count(),
+        'experimentos_total': Bitacora.objects.count(),
+        'experimentos_mes':  Bitacora.objects.filter(fechacirujia__gte=inicio_mes).count(),
+        'usuarios':          Usuarios.objects.count(),
+    })

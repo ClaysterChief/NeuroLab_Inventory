@@ -4,7 +4,8 @@ from .views import (
     AnestesicosViewSet, BitacoraViewSet, CajasViewSet,
     CondicionesViewSet, RatasViewSet, RolesViewSet,
     TejidosViewSet, UsuariosViewSet, login_view, me_view,
-    reporte_bitacora, reporte_inventario,
+    reporte_bitacora, reporte_inventario, stats_view,
+    reporte_inventario_excel, reporte_bitacora_excel,
 )
 
 router = DefaultRouter()
@@ -23,4 +24,7 @@ urlpatterns = [
     path('me/', me_view, name='me'),
     path('reportes/inventario/', reporte_inventario, name='reporte_inventario'),
     path('reportes/bitacora/', reporte_bitacora, name='reporte_bitacora'),
+    path('stats/', stats_view, name='stats'),
+    path('reportes/inventario/excel/', reporte_inventario_excel, name='reporte_inventario_excel'),
+    path('reportes/bitacora/excel/', reporte_bitacora_excel, name='reporte_bitacora_excel'),
 ]

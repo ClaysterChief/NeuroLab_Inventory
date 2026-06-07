@@ -12,3 +12,4 @@ tzdata==2025.2
 reportlab==4.5.1
 pytest==8.3.5
 pytest-django==4.9.0
+openpyxl==3.1.5

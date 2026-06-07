@@ -8,6 +8,9 @@ from reportlab.lib.units import inch
 from reportlab.platypus import (
     Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle,
 )
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 
 from .models import Bitacora, Cajas, Ratas
 
@@ -195,5 +198,157 @@ def generate_bitacora_pdf():
     items.append(tbl)
 
     doc.build(items)
+    buffer.seek(0)
+    return buffer
+
+# ── Colores Excel ──────────────────────────────────────────────────────────────
+XL_DARK  = '1a1a2e'
+XL_RED   = '80201d'
+XL_LIGHT = 'f8f8fb'
+
+
+def _xl_header_style(cell):
+    cell.font      = Font(bold=True, color='FFFFFF', size=10)
+    cell.fill      = PatternFill('solid', fgColor=XL_DARK)
+    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    cell.border    = Border(
+        bottom=Side(style='medium', color=XL_RED)
+    )
+
+
+def _xl_cell_style(cell, even=True):
+    cell.fill      = PatternFill('solid', fgColor=XL_LIGHT if even else 'FFFFFF')
+    cell.font      = Font(size=9)
+    cell.alignment = Alignment(vertical='center', wrap_text=True)
+    cell.border    = Border(
+        bottom=Side(style='thin', color='e0e0e0'),
+        right=Side(style='thin',  color='e0e0e0'),
+    )
+
+
+def _xl_title(ws, title, subtitle):
+    ws.merge_cells('A1:H1')
+    t = ws['A1']
+    t.value     = title
+    t.font      = Font(bold=True, size=14, color=XL_DARK)
+    t.alignment = Alignment(horizontal='left', vertical='center')
+    ws.row_dimensions[1].height = 24
+
+    ws.merge_cells('A2:H2')
+    s = ws['A2']
+    s.value     = subtitle
+    s.font      = Font(size=9, color='888888')
+    s.alignment = Alignment(horizontal='left')
+    ws.row_dimensions[2].height = 16
+
+
+def generate_inventario_excel():
+    wb = Workbook()
+    now_str = datetime.now().strftime('%d/%m/%Y %H:%M')
+
+    # ── Hoja 1: Cajas ──────────────────────────────────────────────────────────
+    ws1 = wb.active
+    ws1.title = 'Cajas'
+    _xl_title(ws1, 'NeuroLab Inventory — Inventario de Cajas', f'Generado: {now_str}')
+
+    headers1 = ['Caja #', 'Cantidad ratas', 'Sexo', 'F. Nacimiento', 'Talla', 'Responsable', 'Comentarios']
+    widths1  = [9, 14, 10, 14, 10, 18, 30]
+    row_start = 4
+
+    for col, (h, w) in enumerate(zip(headers1, widths1), 1):
+        cell = ws1.cell(row=row_start, column=col, value=h)
+        _xl_header_style(cell)
+        ws1.column_dimensions[get_column_letter(col)].width = w
+    ws1.row_dimensions[row_start].height = 20
+
+    cajas = Cajas.objects.select_related('idusuario').order_by('idcaja')
+    for i, c in enumerate(cajas, 1):
+        row = [
+            c.idcaja, c.cantidadratas, c.sexo or '—',
+            _fmt(c.fechanacimiento), c.talla or '—',
+            c.idusuario.nombreusuario if c.idusuario else '—',
+            c.comentarios or '—',
+        ]
+        for col, val in enumerate(row, 1):
+            cell = ws1.cell(row=row_start + i, column=col, value=val)
+            _xl_cell_style(cell, i % 2 == 0)
+
+    # ── Hoja 2: Ratas ──────────────────────────────────────────────────────────
+    ws2 = wb.create_sheet('Ratas')
+    _xl_title(ws2, 'NeuroLab Inventory — Registro de Ratas', f'Generado: {now_str}')
+
+    headers2 = ['ID', 'Sexo', 'N° Cola', 'Caja', 'Condición', 'Peso semanal (g)', 'F. Cirugía']
+    widths2  = [8, 10, 10, 12, 16, 17, 13]
+
+    for col, (h, w) in enumerate(zip(headers2, widths2), 1):
+        cell = ws2.cell(row=row_start, column=col, value=h)
+        _xl_header_style(cell)
+        ws2.column_dimensions[get_column_letter(col)].width = w
+    ws2.row_dimensions[row_start].height = 20
+
+    ratas = Ratas.objects.select_related('idcondicion', 'idcaja').order_by('sexo', 'idrata')
+    for i, r in enumerate(ratas, 1):
+        prefix = r.sexo[0] if r.sexo else '?'
+        row = [
+            f'{prefix}-{r.idrata}', r.sexo or '—', r.numerocola,
+            f'Caja #{r.idcaja.idcaja}' if r.idcaja else '—',
+            r.idcondicion.nombrecondicion if r.idcondicion else '—',
+            r.pesosemanal if r.pesosemanal is not None else '—',
+            _fmt(r.fechacirugia),
+        ]
+        for col, val in enumerate(row, 1):
+            cell = ws2.cell(row=row_start + i, column=col, value=val)
+            _xl_cell_style(cell, i % 2 == 0)
+
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+
+def generate_bitacora_excel():
+    wb = Workbook()
+    now_str = datetime.now().strftime('%d/%m/%Y %H:%M')
+
+    ws = wb.active
+    ws.title = 'Bitácora'
+    _xl_title(ws, 'NeuroLab Inventory — Bitácora de Experimentos', f'Generado: {now_str}')
+
+    headers = ['#', 'Rata', 'Fecha', 'Anestésico', 'Dosis total (ml)',
+               'Peso exp. (g)', 'Tejido', 'Responsable', 'Actividad', 'Notas']
+    widths  = [6, 8, 12, 16, 15, 13, 16, 16, 35, 25]
+    row_start = 4
+
+    for col, (h, w) in enumerate(zip(headers, widths), 1):
+        cell = ws.cell(row=row_start, column=col, value=h)
+        _xl_header_style(cell)
+        ws.column_dimensions[get_column_letter(col)].width = w
+    ws.row_dimensions[row_start].height = 20
+
+    registros = Bitacora.objects.select_related(
+        'idrata', 'idusuario', 'idanestesico', 'idtejido'
+    ).order_by('idbitacora')
+
+    for i, b in enumerate(registros, 1):
+        rata   = b.idrata
+        prefix = rata.sexo[0] if rata and rata.sexo else '?'
+        row = [
+            b.idbitacora,
+            f'{prefix}-{rata.idrata}' if rata else '—',
+            _fmt(b.fechacirujia),
+            b.idanestesico.nombreanestesico if b.idanestesico else '—',
+            b.dosistotal      if b.dosistotal      is not None else '—',
+            b.pesoexperimento if b.pesoexperimento is not None else '—',
+            b.idtejido.nombretejido if b.idtejido else '—',
+            b.idusuario.nombreusuario if b.idusuario else '—',
+            b.actividad or '—',
+            b.notas     or '—',
+        ]
+        for col, val in enumerate(row, 1):
+            cell = ws.cell(row=row_start + i, column=col, value=val)
+            _xl_cell_style(cell, i % 2 == 0)
+
+    buffer = BytesIO()
+    wb.save(buffer)
     buffer.seek(0)
     return buffer
