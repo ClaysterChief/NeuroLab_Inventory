@@ -5,7 +5,7 @@ from django.contrib.auth.hashers import check_password, make_password
 
 from .models import (
     Anestesicos, Bitacora, Cajas, Condiciones,
-    Ratas, Roles, Tejidos, Usuarios
+    Ratas, Roles, Tejidos, Usuarios, PesoSemanal, Ubicaciones
 )
 
 
@@ -96,47 +96,52 @@ class TejidosSerializer(serializers.ModelSerializer):
 
 class CajasSerializer(serializers.ModelSerializer):
     responsable_nombre = serializers.ReadOnlyField(source='idusuario.nombreusuario')
+    ubicacion_nombre   = serializers.ReadOnlyField(source='idubicacion.nombreubicacion')
 
     class Meta:
-        model = Cajas
+        model  = Cajas
         fields = '__all__'
 
-
-# Serializer liviano para anidar dentro de Ratas
 class CajaInfoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Cajas
         fields = ['idcaja', 'sexo', 'cantidadratas', 'talla']
-
-
+        
 # ─── Ratas ────────────────────────────────────────────────────────────────────
 
 class RatasSerializer(serializers.ModelSerializer):
     condicion_nombre = serializers.ReadOnlyField(source='idcondicion.nombrecondicion')
-    # Objeto anidado de la caja (solo lectura, para mostrar en tabla)
-    caja_info = CajaInfoSerializer(source='idcaja', read_only=True)
+    caja_info        = CajaInfoSerializer(source='idcaja', read_only=True)
+    idcaja           = serializers.PrimaryKeyRelatedField(
+        queryset=Cajas.objects.all(), allow_null=True, required=False,
+    )
+    # Último peso desde historial — fuente única de verdad
+    ultimo_peso      = serializers.SerializerMethodField()
+    ultima_fecha_peso = serializers.SerializerMethodField()
+
+    def get_ultimo_peso(self, obj):
+        ultimo = obj.pesos.first()   # pesos ordenados por -fecha
+        return ultimo.peso if ultimo else None
+
+    def get_ultima_fecha_peso(self, obj):
+        ultimo = obj.pesos.first()
+        return str(ultimo.fecha) if ultimo else None
 
     class Meta:
-        model = Ratas
+        model  = Ratas
         fields = '__all__'
-        extra_kwargs = {
-            # idrata es opcional en POST: si no viene, se auto-asigna
-            'idrata': {'required': False},
-        }
+        extra_kwargs = {'idrata': {'required': False}}
 
     def validate(self, attrs):
         idrata = attrs.get('idrata')
-        sexo = attrs.get('sexo', '')
-
-        # Auto-asignar idrata si no fue enviado
+        sexo   = attrs.get('sexo', '')
         if not idrata:
+            from django.db.models import Max
             max_id = Ratas.objects.filter(
                 sexo__iexact=sexo
             ).aggregate(Max('idrata'))['idrata__max']
             attrs['idrata'] = (max_id or 0) + 1
             return attrs
-
-        # Validar unicidad (idrata, sexo), excluyendo el registro actual en PUT
         qs = Ratas.objects.filter(idrata=idrata, sexo__iexact=sexo)
         if self.instance:
             qs = qs.exclude(pk=self.instance.pk)
@@ -145,9 +150,7 @@ class RatasSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 'idrata': f'Ya existe una rata {prefix}-{idrata}. Elige otro ID.'
             })
-
         return attrs
-
 
 # ─── Bitácora ─────────────────────────────────────────────────────────────────
 
@@ -220,3 +223,16 @@ class LoginSerializer(serializers.Serializer):
                 'role_name': user.rol_nombre,
             },
         }
+        
+
+class PesoSemanalSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = PesoSemanal
+        fields = '__all__'
+
+# ─── Ubicaciones ──────────────────────────────────────────────────────────────
+
+class UbicacionesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = Ubicaciones
+        fields = '__all__'

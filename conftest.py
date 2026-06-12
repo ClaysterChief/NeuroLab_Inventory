@@ -8,8 +8,8 @@ que pytest-django inicialice la BD de pruebas.
 """
 from inventario.models import (
     Anestesicos, Bitacora, Cajas, Condiciones,
-    Ratas, Roles, Tejidos, Usuarios,
+    Ratas, Roles, Tejidos, Usuarios, PesoSemanal, Ubicaciones
 )
 
-for _m in (Roles, Anestesicos, Condiciones, Tejidos, Usuarios, Cajas, Ratas, Bitacora):
+for _m in (Roles, Anestesicos, Condiciones, Tejidos, Ubicaciones, Usuarios, Cajas, Ratas, PesoSemanal, Bitacora):
     _m._meta.managed = True

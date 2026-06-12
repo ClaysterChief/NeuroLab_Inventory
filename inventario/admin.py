@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Usuarios, Ratas, Cajas, Bitacora, Anestesicos, Tejidos, Condiciones, Roles
+from .models import Usuarios, Ratas, Cajas, Bitacora, Anestesicos, Tejidos, Condiciones, Roles, PesoSemanal, Ubicaciones
 # Register your models here.
 
 @admin.register(Usuarios)
@@ -12,7 +12,7 @@ class UsuariosAdmin(admin.ModelAdmin):
 
 @admin.register(Ratas)
 class RatasAdmin(admin.ModelAdmin):
-    list_display = ('idrata', 'fechacirugia', 'pesosemanal', 'numerocola', 'idcondicion')
+    list_display = ('idrata', 'fechacirugia', 'numerocola', 'idcondicion')
     search_fields = ('idrata', 'idcondicion__nombrecondicion')
     list_filter = ('idcondicion',)
     ordering = ('idrata',)
@@ -59,3 +59,9 @@ class RolesAdmin(admin.ModelAdmin):
     list_display = ('idrol', 'nombrerol', 'descripcion')
     search_fields = ('nombrerol',)
     ordering = ('idrol',)
+
+@admin.register(Ubicaciones)
+class UbicacionesAdmin(admin.ModelAdmin):
+    list_display  = ('idubicacion', 'nombreubicacion', 'descripcion')
+    search_fields = ('nombreubicacion',)
+    ordering      = ('idubicacion',)

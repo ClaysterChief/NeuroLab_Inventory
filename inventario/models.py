@@ -113,13 +113,17 @@ class Cajas(models.Model):
         Usuarios, db_column='idUsuario', blank=True, null=True,
         on_delete=models.SET_NULL, related_name='cajas'
     )
+    idubicacion = models.ForeignKey(          # ← nuevo
+        'Ubicaciones', db_column='idUbicacion', blank=True, null=True,
+        on_delete=models.SET_NULL, related_name='cajas'
+    )
     comentarios = models.CharField(db_column='Comentarios', max_length=45, blank=True, null=True)
     talla = models.CharField(db_column='Talla', max_length=45, blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed  = False
         db_table = 'cajas'
-        verbose_name = 'Caja'
+        verbose_name        = 'Caja'
         verbose_name_plural = 'Cajas'
 
     def __str__(self):
@@ -127,9 +131,7 @@ class Cajas(models.Model):
 
 
 class Ratas(models.Model):
-    # PK interna — auto-incremental, usada para URLs de API (PUT/DELETE)
     id = models.AutoField(primary_key=True)
-    # ID secuencial por sexo: M-1, M-2... / H-1, H-2... UNIQUE con Sexo en BD
     idrata = models.IntegerField(db_column='idRata')
     sexo = models.CharField(db_column='Sexo', max_length=10)
     idcaja = models.ForeignKey(
@@ -137,7 +139,6 @@ class Ratas(models.Model):
         on_delete=models.SET_NULL, related_name='ratas_en_caja'
     )
     fechacirugia = models.DateField(db_column='FechaCirugia', blank=True, null=True)
-    pesosemanal = models.FloatField(db_column='PesoSemanal', blank=True, null=True)
     numerocola = models.IntegerField(db_column='NumeroCola')
     idcondicion = models.ForeignKey(
         Condiciones, db_column='idCondicion', blank=True, null=True,
@@ -154,7 +155,6 @@ class Ratas(models.Model):
     def __str__(self):
         prefix = self.sexo[0] if self.sexo else '?'
         return f'Rata {prefix}-{self.idrata} (cola: {self.numerocola})'
-
 
 class Bitacora(models.Model):
     idbitacora = models.AutoField(db_column='idBitacora', primary_key=True)
@@ -192,3 +192,36 @@ class Bitacora(models.Model):
 
     def __str__(self):
         return f'Bitácora #{self.idbitacora} — Rata #{self.idrata_id}'
+
+
+class PesoSemanal(models.Model):
+    idrata   = models.ForeignKey(
+        Ratas, db_column='idRata', on_delete=models.CASCADE,
+        related_name='pesos'
+    )
+    fecha    = models.DateField(db_column='fecha')
+    peso     = models.FloatField(db_column='peso')
+    notas    = models.CharField(db_column='notas', max_length=100, blank=True, null=True)
+
+    class Meta:
+        managed  = False
+        db_table = 'pesos_semanales'
+        ordering = ['-fecha']
+        verbose_name        = 'Peso semanal'
+        verbose_name_plural = 'Pesos semanales'
+
+    def __str__(self):
+        return f'Rata #{self.idrata_id} — {self.fecha}: {self.peso}g'
+
+class Ubicaciones(models.Model):
+    idubicacion     = models.AutoField(db_column='idUbicacion', primary_key=True)
+    nombreubicacion = models.CharField(db_column='NombreUbicacion', max_length=45)
+    descripcion     = models.CharField(db_column='Descripcion', max_length=250, blank=True, null=True)
+    class Meta:
+        managed  = False
+        db_table = 'ubicaciones'
+        verbose_name        = 'Ubicación'
+        verbose_name_plural = 'Ubicaciones'
+
+    def __str__(self):
+        return self.nombreubicacion

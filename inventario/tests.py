@@ -205,10 +205,10 @@ def test_actualizar_caja(usuarios, caja):
 def test_actualizar_rata(usuarios, rata, cond):
     token, _ = login('enc_test', 'enc123')
     c = auth_client(token)
-    res = c.patch(f'/api/ratas/{rata.id}/', {'pesosemanal': 350.5}, format='json')
+    res = c.patch(f'/api/ratas/{rata.id}/', {'numerocola': 99}, format='json')
     assert res.status_code == 200
     rata.refresh_from_db()
-    assert rata.pesosemanal == 350.5
+    assert rata.numerocola == 99
 
 
 # ── CP-06: Eliminación (solo Admin) ───────────────────────────────────────────

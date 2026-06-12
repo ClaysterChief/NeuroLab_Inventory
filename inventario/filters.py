@@ -21,6 +21,7 @@ class RatasFilter(django_filters.FilterSet):
 
 class CajasFilter(django_filters.FilterSet):
     sexo   = django_filters.CharFilter(field_name='sexo', lookup_expr='iexact')
+    idubicacion = django_filters.NumberFilter(field_name='idubicacion')
     search = django_filters.CharFilter(method='filter_search')
 
     def filter_search(self, queryset, name, value):
@@ -32,7 +33,7 @@ class CajasFilter(django_filters.FilterSet):
 
     class Meta:
         model = Cajas
-        fields = ['sexo']
+        fields = ['sexo', 'idubicacion']
 
 
 class BitacoraFilter(django_filters.FilterSet):

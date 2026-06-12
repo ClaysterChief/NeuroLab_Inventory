@@ -18,15 +18,15 @@ from django.http import HttpResponse
 from .reports import generate_bitacora_pdf, generate_inventario_pdf
 from .reports import (
     generate_bitacora_pdf, generate_inventario_pdf,
-    generate_inventario_excel, generate_bitacora_excel,   # ← agregar
+    generate_inventario_excel, generate_bitacora_excel,
 )
 from .filters import BitacoraFilter, CajasFilter, RatasFilter
-from .models import Anestesicos, Bitacora, Cajas, Condiciones, Ratas, Roles, Tejidos, Usuarios
+from .models import Anestesicos, Bitacora, Cajas, Condiciones, Ratas, Roles, Tejidos, Usuarios, PesoSemanal, Ubicaciones
 from .permissions import IsAdminRole, ReadOnlyForPracticante
 from .serializers import (
     AnestesicosSerializer, BitacoraSerializer, CajasSerializer,
     CondicionesSerializer, RatasSerializer, RolesSerializer,
-    TejidosSerializer, UsuariosSerializer, LoginSerializer,
+    TejidosSerializer, UsuariosSerializer, LoginSerializer, PesoSemanalSerializer, UbicacionesSerializer
 )
 
 
@@ -97,7 +97,7 @@ class CajasViewSet(viewsets.ModelViewSet):
 class RatasViewSet(viewsets.ModelViewSet):
     queryset = Ratas.objects.select_related(
         'idcondicion', 'idcaja'
-    ).all().order_by('sexo', 'idrata')
+    ).prefetch_related('pesos').all().order_by('sexo', 'idrata')
     serializer_class = RatasSerializer
     permission_classes = [IsAuthenticated, ReadOnlyForPracticante]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
@@ -198,16 +198,112 @@ def reporte_bitacora_excel(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def stats_view(request):
-    """GET /api/stats/ — Contadores para el dashboard."""
     from django.utils import timezone
+    from django.db.models import Count
     inicio_mes = timezone.now().date().replace(day=1)
 
+    cajas_por_ubicacion = list(
+        Cajas.objects
+        .values('idubicacion__nombreubicacion')
+        .annotate(total=Count('idcaja'))
+        .order_by('-total')
+    )
+
     return Response({
-        'cajas':             Cajas.objects.count(),
-        'ratas_total':       Ratas.objects.count(),
-        'ratas_macho':       Ratas.objects.filter(sexo__iexact='Macho').count(),
-        'ratas_hembra':      Ratas.objects.filter(sexo__iexact='Hembra').count(),
+        'cajas':              Cajas.objects.count(),
+        'ratas_total':        Ratas.objects.count(),
+        'ratas_macho':        Ratas.objects.filter(sexo__iexact='Macho').count(),
+        'ratas_hembra':       Ratas.objects.filter(sexo__iexact='Hembra').count(),
         'experimentos_total': Bitacora.objects.count(),
-        'experimentos_mes':  Bitacora.objects.filter(fechacirujia__gte=inicio_mes).count(),
-        'usuarios':          Usuarios.objects.count(),
+        'experimentos_mes':   Bitacora.objects.filter(fechacirujia__gte=inicio_mes).count(),
+        'usuarios':           Usuarios.objects.count(),
+        'cajas_por_ubicacion': cajas_por_ubicacion,   # ← nuevo
     })
+
+class PesoSemanalViewSet(viewsets.ModelViewSet):
+    serializer_class   = PesoSemanalSerializer
+    permission_classes = [IsAuthenticated, ReadOnlyForPracticante]
+
+    def get_queryset(self):
+        qs = PesoSemanal.objects.select_related('idrata').all()
+        # Filtrar por rata si se pasa el parámetro
+        idrata = self.request.query_params.get('idrata')
+        if idrata:
+            qs = qs.filter(idrata=idrata)
+        return qs
+
+class UbicacionesViewSet(viewsets.ModelViewSet):
+    queryset           = Ubicaciones.objects.all().order_by('nombreubicacion')
+    serializer_class   = UbicacionesSerializer
+    permission_classes = [IsAuthenticated, ReadOnlyForPracticante]
+
+from datetime import date as _date
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def inventario_sesion_view(request):
+    """
+    Guarda una sesión semanal completa en una transacción atómica.
+    Aplica: actualización de comentarios de cajas, nuevos pesos,
+    bajas de ratas y altas de ratas.
+    """
+    from django.db import transaction
+    data = request.data
+
+    try:
+        with transaction.atomic():
+            res = {
+                'pesos_guardados': 0,
+                'cajas_actualizadas': 0,
+                'ratas_dadas_de_baja': 0,
+                'ratas_agregadas': 0,
+            }
+
+            # 1. Comentarios de cajas
+            for cambio in data.get('cambios_cajas', []):
+                n = Cajas.objects.filter(idcaja=cambio['idcaja']).update(
+                    comentarios=cambio.get('comentarios', '')
+                )
+                if n:
+                    res['cajas_actualizadas'] += 1
+
+            # 2. Pesos semanales
+            fecha_sesion = data.get('fecha') or str(_date.today())
+            for p in data.get('nuevos_pesos', []):
+                if p.get('peso') is not None:
+                    PesoSemanal.objects.create(
+                        idrata_id=p['idrata'],
+                        fecha=p.get('fecha', fecha_sesion),
+                        peso=p['peso'],
+                        notas=p.get('notas', '') or '',
+                    )
+                    res['pesos_guardados'] += 1
+
+            # 3. Bajas (eliminar rata — trigger actualiza CantidadRatas)
+            for rid in data.get('bajas_ratas', []):
+                Ratas.objects.filter(id=rid).delete()
+                res['ratas_dadas_de_baja'] += 1
+
+            # 4. Altas — asignar idrata por sexo
+            sex_counter = {}
+            for nr in data.get('nuevas_ratas', []):
+                sexo = nr.get('sexo', 'Macho')
+                if sexo not in sex_counter:
+                    ultimo = Ratas.objects.filter(
+                        sexo__iexact=sexo
+                    ).order_by('-idrata').first()
+                    sex_counter[sexo] = (ultimo.idrata if ultimo else 0)
+                sex_counter[sexo] += 1
+                Ratas.objects.create(
+                    idrata=sex_counter[sexo],
+                    sexo=sexo,
+                    numerocola=nr.get('numerocola'),
+                    idcaja_id=nr.get('idcaja') or None,
+                    idcondicion_id=nr.get('idcondicion') or None,
+                    fechacirugia=nr.get('fechacirugia') or None,
+                )
+                res['ratas_agregadas'] += 1
+
+        return Response({'ok': True, 'resultados': res})
+    except Exception as e:
+        return Response({'ok': False, 'error': str(e)}, status=400)
