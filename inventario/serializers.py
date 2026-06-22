@@ -7,6 +7,7 @@ from .models import (
     Anestesicos, Bitacora, Cajas, Condiciones,
     Ratas, Roles, Tejidos, Usuarios, PesoSemanal, Ubicaciones
 )
+from .utils import create_with_next_available_id
 
 
 # ─── Catálogos ────────────────────────────────────────────────────────────────
@@ -15,6 +16,9 @@ class RolesSerializer(serializers.ModelSerializer):
     class Meta:
         model = Roles
         fields = '__all__'
+
+    def create(self, validated_data):
+        return create_with_next_available_id(Roles, 'idrol', validated_data)
 
 
 class UsuariosSerializer(serializers.ModelSerializer):
@@ -59,10 +63,14 @@ class UsuariosSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         password = validated_data.pop('password')
-        user = Usuarios(**validated_data)
-        user.password = make_password(password)
-        user.save()
-        return user
+
+        def _build(data):
+            user = Usuarios(**data)
+            user.password = make_password(password)
+            user.save()
+            return user
+
+        return create_with_next_available_id(Usuarios, 'idusuario', validated_data, build_instance=_build)
 
     def update(self, instance, validated_data):
         password = validated_data.pop('password', None)
@@ -79,17 +87,26 @@ class AnestesicosSerializer(serializers.ModelSerializer):
         model = Anestesicos
         fields = '__all__'
 
+    def create(self, validated_data):
+        return create_with_next_available_id(Anestesicos, 'idanestesico', validated_data)
+
 
 class CondicionesSerializer(serializers.ModelSerializer):
     class Meta:
         model = Condiciones
         fields = '__all__'
 
+    def create(self, validated_data):
+        return create_with_next_available_id(Condiciones, 'idcondicion', validated_data)
+
 
 class TejidosSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tejidos
         fields = '__all__'
+
+    def create(self, validated_data):
+        return create_with_next_available_id(Tejidos, 'idtejido', validated_data)
 
 
 # ─── Cajas ────────────────────────────────────────────────────────────────────
@@ -101,6 +118,9 @@ class CajasSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Cajas
         fields = '__all__'
+
+    def create(self, validated_data):
+        return create_with_next_available_id(Cajas, 'idcaja', validated_data)
 
 class CajaInfoSerializer(serializers.ModelSerializer):
     class Meta:
@@ -166,6 +186,9 @@ class BitacoraSerializer(serializers.ModelSerializer):
         model = Bitacora
         fields = '__all__'
 
+    def create(self, validated_data):
+        return create_with_next_available_id(Bitacora, 'idbitacora', validated_data)
+
 
 # ─── Login ────────────────────────────────────────────────────────────────────
 
@@ -230,9 +253,66 @@ class PesoSemanalSerializer(serializers.ModelSerializer):
         model  = PesoSemanal
         fields = '__all__'
 
+
+# ─── Cambio de contraseña propia (cualquier rol) ──────────────────────────────
+
+class CambiarPasswordSerializer(serializers.Serializer):
+    """
+    A diferencia de UsuariosSerializer (solo Administrador, gestiona a
+    CUALQUIER usuario), este serializer permite que CUALQUIER usuario
+    autenticado, sin importar su rol, cambie su PROPIA contraseña,
+    siempre que confirme correctamente la contraseña actual.
+    """
+    password_actual = serializers.CharField(max_length=128, write_only=True)
+    password_nueva = serializers.CharField(max_length=128, write_only=True)
+    password_nueva_confirm = serializers.CharField(max_length=128, write_only=True)
+
+    DJANGO_HASH_PREFIXES = (
+        'pbkdf2_sha256$', 'pbkdf2_sha1$', 'argon2', 'bcrypt', 'sha1$', 'md5$',
+    )
+
+    def validate(self, attrs):
+        user = self.context['request'].user
+        actual = attrs.get('password_actual', '')
+        nueva = attrs.get('password_nueva', '')
+        confirm = attrs.get('password_nueva_confirm', '')
+
+        stored = user.password or ''
+        if any(stored.startswith(p) for p in self.DJANGO_HASH_PREFIXES):
+            actual_valida = check_password(actual, stored)
+        else:
+            actual_valida = (stored == actual)
+
+        if not actual_valida:
+            raise serializers.ValidationError(
+                {'password_actual': 'La contraseña actual es incorrecta.'}
+            )
+        if len(nueva) < 6:
+            raise serializers.ValidationError(
+                {'password_nueva': 'La nueva contraseña debe tener al menos 6 caracteres.'}
+            )
+        if nueva != confirm:
+            raise serializers.ValidationError(
+                {'password_nueva_confirm': 'Las contraseñas no coinciden.'}
+            )
+        if nueva == actual:
+            raise serializers.ValidationError(
+                {'password_nueva': 'La nueva contraseña debe ser diferente a la actual.'}
+            )
+        return attrs
+
+    def save(self):
+        user = self.context['request'].user
+        user.password = make_password(self.validated_data['password_nueva'])
+        user.save(update_fields=['password'])
+        return user
+
 # ─── Ubicaciones ──────────────────────────────────────────────────────────────
 
 class UbicacionesSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Ubicaciones
         fields = '__all__'
+
+    def create(self, validated_data):
+        return create_with_next_available_id(Ubicaciones, 'idubicacion', validated_data)

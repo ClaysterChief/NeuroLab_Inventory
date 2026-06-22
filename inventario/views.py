@@ -26,7 +26,8 @@ from .permissions import IsAdminRole, ReadOnlyForPracticante
 from .serializers import (
     AnestesicosSerializer, BitacoraSerializer, CajasSerializer,
     CondicionesSerializer, RatasSerializer, RolesSerializer,
-    TejidosSerializer, UsuariosSerializer, LoginSerializer, PesoSemanalSerializer, UbicacionesSerializer
+    TejidosSerializer, UsuariosSerializer, LoginSerializer, PesoSemanalSerializer, UbicacionesSerializer,
+    CambiarPasswordSerializer,
 )
 
 
@@ -53,6 +54,26 @@ def me_view(request):
         'role_id':        user.rol_id,
         'role_name':      user.rol_nombre,
     })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def cambiar_password_view(request):
+    """
+    POST /api/cambiar-password/
+
+    Permite a CUALQUIER usuario autenticado (Administrador, Encargado o
+    Practicante) cambiar su PROPIA contraseña, siempre que confirme
+    correctamente la contraseña actual. A diferencia de UsuariosViewSet
+    (restringido a Administrador, gestiona a cualquier usuario), este
+    endpoint solo opera sobre request.user — nadie puede cambiar la
+    contraseña de otra persona desde aquí.
+    """
+    serializer = CambiarPasswordSerializer(data=request.data, context={'request': request})
+    if serializer.is_valid():
+        serializer.save()
+        return Response({'ok': True, 'mensaje': 'Contraseña actualizada correctamente.'})
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 # ─── Catálogos ─────────────────────────────────────────────────────────────────
@@ -134,6 +155,28 @@ class BitacoraViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_class = BitacoraFilter
     pagination_class = StandardPagination
+    # Habilita ?ordering=fechacirujia / ?ordering=-fechacirujia (más
+    # reciente primero, el valor por defecto del queryset ya es -idbitacora
+    # que en la práctica coincide con orden de creación).
+    ordering_fields = ['fechacirujia', 'idbitacora']
+
+    @action(detail=False, methods=['get'], url_path='proyectos')
+    def proyectos(self, request):
+        """
+        GET /api/bitacora/proyectos/
+        Devuelve la lista de nombres de proyecto ya usados (sin
+        duplicados), para poblar el filtro "Proyecto" en el frontend
+        como un selector en vez de texto libre.
+        """
+        nombres = (
+            Bitacora.objects
+            .exclude(nombreproyecto__isnull=True)
+            .exclude(nombreproyecto__exact='')
+            .order_by('nombreproyecto')
+            .values_list('nombreproyecto', flat=True)
+            .distinct()
+        )
+        return Response(list(nombres))
 
 
 # ─── Usuarios ──────────────────────────────────────────────────────────────────
@@ -217,8 +260,90 @@ def stats_view(request):
         'experimentos_total': Bitacora.objects.count(),
         'experimentos_mes':   Bitacora.objects.filter(fechacirujia__gte=inicio_mes).count(),
         'usuarios':           Usuarios.objects.count(),
-        'cajas_por_ubicacion': cajas_por_ubicacion,   # ← nuevo
+        'cajas_por_ubicacion': cajas_por_ubicacion,
+        # ── Tres tarjetas resumen del dashboard ──
+        'ultima_caja':         _resumen_ultima_caja(),
+        'ultimo_experimento':  _resumen_ultimo_experimento(),
+        'alerta_peso':         _resumen_alerta_peso(),
     })
+
+
+def _resumen_ultima_caja():
+    """Última caja registrada (la de mayor ID)."""
+    caja = (
+        Cajas.objects
+        .select_related('idubicacion')
+        .order_by('-idcaja')
+        .first()
+    )
+    if not caja:
+        return None
+    return {
+        'idcaja':      caja.idcaja,
+        'sexo':        caja.sexo,
+        'cantidad':    caja.cantidadratas,
+        'ubicacion':   caja.idubicacion.nombreubicacion if caja.idubicacion else None,
+        'fechanacimiento': caja.fechanacimiento.isoformat() if caja.fechanacimiento else None,
+    }
+
+
+def _resumen_ultimo_experimento():
+    """Último experimento registrado en la bitácora (mayor ID)."""
+    b = (
+        Bitacora.objects
+        .select_related('idrata', 'idanestesico')
+        .order_by('-idbitacora')
+        .first()
+    )
+    if not b:
+        return None
+    rata = b.idrata
+    prefix = rata.sexo[0] if rata and rata.sexo else '?'
+    return {
+        'idbitacora':   b.idbitacora,
+        'rata':         f'{prefix}-{rata.idrata}' if rata else None,
+        'proyecto':     b.nombreproyecto,
+        'fecha':        b.fechacirujia.isoformat() if b.fechacirujia else None,
+        'anestesico':   b.idanestesico.nombreanestesico if b.idanestesico else None,
+    }
+
+
+def _resumen_alerta_peso():
+    """
+    Rata con el descenso de peso porcentual más severo entre sus dos
+    registros más recientes. Solo se consideran ratas con 2+ pesos.
+    Devuelve None si ninguna rata ha bajado de peso (todas estables o
+    subiendo), de modo que la tarjeta pueda mostrar un estado tranquilo.
+    """
+    peor = None  # (pct_descenso, dict)
+
+    # Recorremos solo las ratas que tienen al menos un peso registrado.
+    ratas_con_peso = (
+        Ratas.objects
+        .filter(pesos__isnull=False)
+        .distinct()
+        .prefetch_related('pesos')
+    )
+
+    for rata in ratas_con_peso:
+        pesos = list(rata.pesos.all().order_by('-fecha')[:2])
+        if len(pesos) < 2:
+            continue
+        actual, anterior = pesos[0].peso, pesos[1].peso
+        if anterior <= 0:
+            continue
+        pct = (actual - anterior) / anterior * 100  # negativo = bajó
+        if pct < 0 and (peor is None or pct < peor[0]):
+            prefix = rata.sexo[0] if rata.sexo else '?'
+            peor = (pct, {
+                'rata':       f'{prefix}-{rata.idrata}',
+                'peso_actual':   round(actual, 1),
+                'peso_anterior': round(anterior, 1),
+                'variacion_pct': round(pct, 1),
+                'fecha':         pesos[0].fecha.isoformat() if pesos[0].fecha else None,
+            })
+
+    return peor[1] if peor else None
 
 class PesoSemanalViewSet(viewsets.ModelViewSet):
     serializer_class   = PesoSemanalSerializer

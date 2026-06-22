@@ -6,7 +6,8 @@ from .views import (
     CondicionesViewSet, RatasViewSet, RolesViewSet,
     TejidosViewSet, UsuariosViewSet, login_view, me_view,
     reporte_bitacora, reporte_inventario, stats_view,
-    reporte_inventario_excel, reporte_bitacora_excel, PesoSemanalViewSet, UbicacionesViewSet
+    reporte_inventario_excel, reporte_bitacora_excel, PesoSemanalViewSet, UbicacionesViewSet,
+    cambiar_password_view,
 )
 
 router = DefaultRouter()
@@ -25,10 +26,11 @@ urlpatterns = [
     path('', include(router.urls)),
     path('login/', login_view, name='login'),
     path('me/', me_view, name='me'),
+    path('cambiar-password/', cambiar_password_view, name='cambiar_password'),
     path('reportes/inventario/', reporte_inventario, name='reporte_inventario'),
     path('reportes/bitacora/', reporte_bitacora, name='reporte_bitacora'),
     path('stats/', stats_view, name='stats'),
     path('reportes/inventario/excel/', reporte_inventario_excel, name='reporte_inventario_excel'),
     path('reportes/bitacora/excel/', reporte_bitacora_excel, name='reporte_bitacora_excel'),
-    path('api/inventario/sesion/', inventario_sesion_view, name='inventario_sesion'),
+    path('inventario/sesion/', inventario_sesion_view, name='inventario_sesion'),
 ]

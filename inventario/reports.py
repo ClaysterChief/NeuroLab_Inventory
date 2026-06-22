@@ -169,7 +169,7 @@ def generate_bitacora_pdf():
         'idrata', 'idusuario', 'idanestesico', 'idtejido'
     ).order_by('idbitacora')
 
-    rows = [['#', 'Rata', 'Fecha', 'Anestésico', 'Dosis total (ml)',
+    rows = [['#', 'Rata', 'Proyecto', 'Fecha', 'Anestésico', 'Dosis total (ml)',
              'Peso exp. (g)', 'Tejido', 'Responsable', 'Actividad']]
     for b in registros:
         rata = b.idrata
@@ -178,6 +178,7 @@ def generate_bitacora_pdf():
         rows.append([
             str(b.idbitacora),
             rata_label,
+            b.nombreproyecto or '—',
             _fmt(b.fechacirujia),
             b.idanestesico.nombreanestesico if b.idanestesico else '—',
             str(b.dosistotal)     if b.dosistotal     is not None else '—',
@@ -187,12 +188,12 @@ def generate_bitacora_pdf():
             _trunc(b.actividad, 50),
         ])
     if len(rows) == 1:
-        rows.append(['Sin registros'] + [''] * 8)
+        rows.append(['Sin registros'] + [''] * 9)
 
     tbl = Table(
         rows,
-        colWidths=[0.35*inch, 0.55*inch, 0.8*inch, 1.1*inch, 0.9*inch,
-                   0.9*inch, 0.9*inch, 1.0*inch, 2.7*inch],
+        colWidths=[0.35*inch, 0.5*inch, 0.95*inch, 0.75*inch, 0.95*inch,
+                   0.85*inch, 0.85*inch, 0.85*inch, 0.95*inch, 2.15*inch],
     )
     tbl.setStyle(_table_style())
     items.append(tbl)
@@ -314,9 +315,9 @@ def generate_bitacora_excel():
     ws.title = 'Bitácora'
     _xl_title(ws, 'NeuroLab Inventory — Bitácora de Experimentos', f'Generado: {now_str}')
 
-    headers = ['#', 'Rata', 'Fecha', 'Anestésico', 'Dosis total (ml)',
+    headers = ['#', 'Rata', 'Proyecto', 'Fecha', 'Anestésico', 'Dosis total (ml)',
                'Peso exp. (g)', 'Tejido', 'Responsable', 'Actividad', 'Notas']
-    widths  = [6, 8, 12, 16, 15, 13, 16, 16, 35, 25]
+    widths  = [6, 8, 16, 12, 16, 15, 13, 16, 16, 35, 25]
     row_start = 4
 
     for col, (h, w) in enumerate(zip(headers, widths), 1):
@@ -335,6 +336,7 @@ def generate_bitacora_excel():
         row = [
             b.idbitacora,
             f'{prefix}-{rata.idrata}' if rata else '—',
+            b.nombreproyecto or '—',
             _fmt(b.fechacirujia),
             b.idanestesico.nombreanestesico if b.idanestesico else '—',
             b.dosistotal      if b.dosistotal      is not None else '—',

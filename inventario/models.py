@@ -178,6 +178,9 @@ class Bitacora(models.Model):
         Tejidos, db_column='idTejido', blank=True, null=True,
         on_delete=models.SET_NULL, related_name='bitacoras'
     )
+    nombreproyecto = models.CharField(
+        db_column='NombreProyecto', max_length=150, blank=True, null=True
+    )
     archivos = models.CharField(db_column='Archivos', max_length=45, blank=True, null=True)
     ubicacionarchivo = models.CharField(
         db_column='UbicacionArchivo', max_length=45, blank=True, null=True
